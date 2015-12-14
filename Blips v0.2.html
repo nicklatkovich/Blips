@@ -1,0 +1,178 @@
+﻿<script>
+const CUBE_START_SIZE = 32;
+const CUBE_STEP_SIZE = 1;
+const STEPS_TO_CAN_CREATE = 32;
+
+function parse(i, a) {
+	var str = "";
+	while (a > 0) {
+		var k = i / Math.pow(10, --a);
+		if (k < 1) {
+			str += 0;
+		}
+		else {
+			str += Math.floor(k) % 10;
+		}
+	}
+	return str;
+}
+
+function cube_Resize(i, size) {
+	cubes[i].size = size;
+	var temp = size / 2;
+	cubes[i].left = cubes[i].pos_x - temp;
+	cubes[i].top = cubes[i].pos_y - temp;
+}
+
+function Step() {
+	var game_Over = false;
+	for (var i = 0; i < num_Cubes; i++) {
+		cube_Resize(i, cubes[i].size + CUBE_STEP_SIZE);
+	}
+	for (var i = 0; i < num_Cubes; i++) {
+		for (var j = 0; j < num_Cubes; j++) {
+			if (i != j) {
+				var temp = (cubes[i].size + cubes[j].size) / 2;
+				if (Math.abs(cubes[i].pos_x - cubes[j].pos_x) < temp &&
+						(Math.abs(cubes[i].pos_y - cubes[j].pos_y) < temp)) {
+					clearInterval(intervalID);
+					score += Math.floor(cubes[i].size);
+					cubes[i].damaged = true;
+					game_Over = true;
+				}
+			}
+		}
+	}
+	if (game_Over) {
+		divLS.innerHTML = "Last Score = " + score;
+		if (score > highscore) {
+			highscore = score;
+			divHS.innerHTML = "High Score = " + score;
+		}
+		setTimeout(Restart, 1000);
+	}
+	else {
+		steps_To_Can_Create--;
+		if (steps_To_Can_Create <= 0) {
+			clearInterval(intervalID);
+			can_Create = true;
+		}
+	}
+	redraw();
+}
+
+function Restart() {
+	num_Cubes = 0;
+	can_Create = true;
+	score = 0;
+}
+
+function redraw() {
+	surf.clearRect(0, 0, draw.width, draw.height);
+	for (var i = 0; i < num_Cubes; i++) {
+		if (cubes[i].damaged) {
+			surf.drawImage(image[1], cubes[i].left, cubes[i].top, cubes[i].size, cubes[i].size);
+		}
+		else {
+			surf.drawImage(image[0], cubes[i].left, cubes[i].top, cubes[i].size, cubes[i].size);
+		}
+	}
+	for (var i = 0; i < num_Cubes; i++) {
+		if (cubes[i].damaged) {
+			surf.fillText("+ " + Math.floor(cubes[i].size), cubes[i].left, cubes[i].top);
+		}
+	}
+}
+
+function water_Redraw() {
+	surf_water.clearRect(0, 0, water_still.width, water_still.height);
+	for (var i = 0; i < water_still.width; i += 256) {
+		for (var j = 0; j < water_still.height; j += 256) {
+			surf_water.drawImage(water[water_frame], i, j);
+		}
+	}
+	if (water_is_loaded == 64) {
+		water_frame++;
+	}
+	if (water_frame >= water.length) {
+		water_frame -= water.length;
+	}
+}
+
+function images_load() {
+	image[0] = new Image();
+	image[0].src = 'cubes/ice.png';
+	image[0].onload = function() { can_Create = true; redraw(); };
+	image[1] = new Image();
+	image[1].src = 'cubes/frosted_ice.png';
+	image[1].onload = function() { redraw(); };
+}
+
+function water_load() {
+	water_is_loaded = 0;
+	water = new Array();
+	for (var i = 0; i < 64; i++) {
+		water[i] = new Image();
+		water[i].src = 'water_still/water_still_' + parse(i + 1, 2) + '.png';
+		water[i].onload = function() {
+			water_is_loaded++;
+			if (water_is_loaded == 64) {
+				setInterval(water_Redraw, 32);
+			}
+			else if (water_is_loaded == 1) {
+				water_Redraw();
+			}
+		};
+	}
+}
+</script>
+
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Blips v0.2 by NL</title>
+    </head>
+    <body>
+		<canvas id="water_still" width="640" height="480" style="border: 4px solid; position: absolute; left: 100px;">
+		</canvas>
+		<canvas id="draw" width="640" height="480" style="border: 4px solid; position: absolute; left: 100px;">
+		</canvas>
+		<div id="divHS" style="position: absolute; right: 100px; font-size: 64">
+			High Score = 0;
+		</div>
+		<div id="divLS" style="position: absolute; right: 100px; top: 200; font-size: 64">
+			Last Score = 0;
+		</div>
+    </body>
+</html>
+
+<script>
+image = new Array();
+images_load();
+water_load();
+can_Create = false;
+num_Cubes = 0;
+cubes = new Array();
+steps_To_Can_Create = 0;
+surf = draw.getContext("2d");
+surf_water = water_still.getContext("2d");
+water_frame = 0;
+score = 0;
+highscore = 0;
+surf.font = "32px Arial";
+draw.onclick = function(event) {
+	if (can_Create == true) {
+		var Mouse_X = event.pageX - draw.offsetLeft - 4;//4 - borderWidth of surface (tag01)
+		var Mouse_Y = event.pageY - draw.offsetTop - 4;
+		cubes[num_Cubes] = {};
+		cubes[num_Cubes].pos_x = Mouse_X;
+		cubes[num_Cubes].pos_y = Mouse_Y;
+		cubes[num_Cubes].damaged = false;
+		cube_Resize(num_Cubes, CUBE_START_SIZE);
+		num_Cubes++;
+		can_Create = false;
+		steps_To_Can_Create = STEPS_TO_CAN_CREATE;
+		intervalID = setInterval(Step, 16);
+	}
+}
+</script>
